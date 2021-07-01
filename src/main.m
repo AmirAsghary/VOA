@@ -12,7 +12,7 @@ function main()
     
     fNo = input("Your Choice: ");
 
-    chosenFunction = OF.getFunction(fNo);
+    chosenFunction = @ackleyNo2;
     
     dimentions = fDimentions(fNo);
     nDim = false;
@@ -25,7 +25,6 @@ function main()
     strongViruses = input("Strong Viruses: ");
     maxIterations = input("Max Iterations: ");
     
-    voa = VOA(population,strongViruses,maxIterations, dimentions, fDomains(fNo, :), chosenFunction, nDim);
-    solutions = voa.start();
+    solutions = VOA(population,strongViruses,maxIterations, dimentions, fDomains(fNo, :), chosenFunction, nDim);
     disp(solutions(:, 1:5));
 end

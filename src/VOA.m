@@ -1,139 +1,167 @@
-classdef VOA < handle
-    properties
-        initialPopulation = 0;
-        numberOfStrongViruses = 0;
-        strongVirusGrowth= 0;
-        commonVirusGrowth= 0;
-        maxSolutions = 0;
-        generations = 0;
-        limits = [];
-        population = [];
-        strength = [];
-        ff = {};
-        dims = 0;
-        nDim = false;
-    end
-    
-    methods
-        function obj = VOA(initPop, strongV, maxSolutions, dims, limits, FF, nDim)
-            obj.initialPopulation = initPop;
-            obj.numberOfStrongViruses = strongV;
-            obj.strongVirusGrowth = 1;
-            obj.commonVirusGrowth = 1;
-            obj.maxSolutions = maxSolutions;
-            obj.generations = 0;
-            obj.dims = dims;
-            obj.limits = limits;
-            obj.ff = FF;
-            obj.nDim = nDim;
+function solutions = VOA(initPop, strongVCount, maxSolutions, dims, limits, FF, nDim)
+             strongVirusGrowth = 1;
+             commonVirusGrowth = 1;
+             generations = 0;
             
-            obj.population = [];
-            obj.strength = [];
-        end
-        
-        function generatePopulation(obj)
-            min = obj.limits(1);
-            max = obj.limits(2);
-            obj.population = (max-min).*rand(obj.dims, obj.initialPopulation) + min;
-            disp("generated population");
-        end
-        function evaluateFFValue(obj)
-            strn = [];
-
-            pop2cell = num2cell(obj.population, 1);
-            strn = cellfun(@obj.ff, pop2cell);
+             population = [];
+             strength = [];
             
-            obj.strength = strn;
+            solutions = [];
+            tic;
             
-            [obj.strength,sortIdx] = sort(obj.strength,'ascend');
-            obj.population = obj.population(:, sortIdx);
-        end 
-        function popPerformance = evaluatePopPerformance(obj)
-            popPerformance = mean(obj.strength);
-        end
-        function intensifyExploitation(obj)
-           obj.strongVirusGrowth = obj.strongVirusGrowth + 1;
-        end
-        function randNum = randomInRange(obj, thisPos, class)
-            if class == "strong"
-                intensity = obj.strongVirusGrowth;
-            else
-                intensity = obj.commonVirusGrowth;
+            population = generatePopulation(limits(1), limits(2), dims, initPop);
+            [s, p] = evaluateFFValue(population, FF);
+            population = p;
+            strength = s;
+            
+            while true
+                performance = evaluatePopPerformance(strength);
+            
+                % classification
+                StrongViruses = population(:, 1:strongVCount);
+                CommonViruses = population(:, strongVCount+1:end);
+                
+                % replication
+                newStrongViruses = replicate(StrongViruses, "strong", limits(1), limits(2), strongVirusGrowth, dims);
+                newCommonViruses = replicate(CommonViruses, "common", limits(1), limits(2), commonVirusGrowth, dims);
+                
+                % combination and ranking
+                newViruses = [newStrongViruses newCommonViruses];
+                population = combine(population, newViruses);
+                [s, p] = evaluateFFValue(population, FF);
+                population = p;
+                strength = s;
+                
+                % performance check (with a margin of error: 1)
+                newPerformance = evaluatePopPerformance(strength);
+                if newPerformance -1 > performance
+                    strongVirusGrowth = intensifyExploitation(strongVirusGrowth);
+                end
+                
+                % apply anti-virus
+                newPop = attackViruses(strongVCount, population, strength);
+                population = newPop;
+                [s, p] = evaluateFFValue(population, FF);
+                population = p;
+                strength = s;
+                
+                % reduction
+                if size(population, 2) > 1000
+                    newPop = reduceViruses(1000, population, initPop);
+                    population = newPop;
+                end
+                
+                % check stopping criterion
+                [gen, is_stoppable] = isStoppable(generations, maxSolutions);
+                generations = gen;
+                if is_stoppable == true
+                    break;
+                end
+                
             end
+            disp(strength(:, 1:5));
+            solutions = population;
             
-            min = obj.limits(1);
-            max = obj.limits(2);
-            randNum = thisPos + ((max-min).*rand(1,1) + min)/intensity * thisPos;
-            while (randNum < min) || (randNum > max)
-                randNum = thisPos + ((max-min).*rand(1,1) + min)/intensity * thisPos;
-            end   
-        end    
-        function newViruses = replicate(obj, viruses, class)
+            toc;
+end    
+   
+
+function population = generatePopulation(min, max, dims, initPop)
+	population = (max-min).*rand(dims, initPop) + min;
+	disp("generated population");
+end
+
+function [strength, pop] = evaluateFFValue(pop, ff)
+	pop2cell = num2cell(pop, 1);
+	strength = cellfun(ff, pop2cell);
+            
+	[strength,sortIdx] = sort(strength,'ascend');
+	pop = pop(:, sortIdx);
+end 
+
+function popPerformance = evaluatePopPerformance(strength)
+    popPerformance = mean(strength);
+end
+
+function newGrowth = intensifyExploitation(growth)
+    newGrowth = growth + 1;
+end
+
+function randNum = randomInRange(min, max, intensity, thisPos)
+	randNum = thisPos + ((max-min).*rand(1,1) + min)/intensity * thisPos;
+	while (randNum < min) || (randNum > max)
+        randNum = thisPos + ((max-min).*rand(1,1) + min)/intensity * thisPos;
+	end   
+end
+
+function newViruses = replicate(viruses, class, min, max, intensity, dims)
             newViruses = [];
-            
             if class == "strong"
                 for i= 1:size(viruses,2)
                     N1 = [];
-                    for d = 1:obj.dims
-                        N1(end+1) = obj.randomInRange(viruses(d, i), "strong");
+                    for d = 1:dims
+                        N1(end+1) = randomInRange(min, max, intensity, viruses(d, i));
                     end
                     newViruses = [newViruses(:,1:end) transpose(N1)];
 
                     N2 = [];
-                    for d = 1:obj.dims
-                        N2(end+1) = obj.randomInRange(viruses(d, i), "strong");
+                    for d = 1:dims
+                        N2(end+1) = randomInRange(min, max, intensity, viruses(d, i));
                     end
                     newViruses = [newViruses(:,1:end) transpose(N2)];
                     
                     N3 = [];
-                    for d = 1:obj.dims
-                        N3(end+1) = obj.randomInRange(viruses(d, i), "strong");
+                    for d = 1:dims
+                        N3(end+1) = randomInRange(min, max, intensity, viruses(d, i));
                     end
                     newViruses = [newViruses(:,1:end) transpose(N3)];
                     
                     N4 = [];
-                    for d = 1:obj.dims
-                        N4(end+1) = obj.randomInRange(viruses(d, i), "strong");
+                    for d = 1:dims
+                        N4(end+1) = randomInRange(min, max, intensity, viruses(d, i));
                     end
                     newViruses = [newViruses(:,1:end) transpose(N4)];
                 end    
             else
                 for i= 1:size(viruses,2)
+                    
                     N1 = [];
-                    for d = 1:obj.dims
-                        N1(end+1) = obj.randomInRange(viruses(d, i), "common");
+                    for d = 1:dims
+                        N1(end+1) = randomInRange(min, max, intensity, viruses(d, i));
                     end
                     newViruses = [newViruses(:,1:end) transpose(N1)];
-
+                    
                     N2 = [];
-                    for d = 1:obj.dims
-                        N2(end+1) = obj.randomInRange(viruses(d, i), "common");
+                    for d = 1:dims
+                        N2(end+1) = randomInRange(min, max, intensity, viruses(d, i));
                     end
                     newViruses = [newViruses(:,1:end) transpose(N2)];
                     
                     N3 = [];
-                    for d = 1:obj.dims
-                        N3(end+1) = obj.randomInRange(viruses(d, i), "common");
+                    for d = 1:dims
+                        N3(end+1) = randomInRange(min, max, intensity, viruses(d, i));
                     end
                     newViruses = [newViruses(:,1:end) transpose(N3)];
                 end   
             end    
   
-        end
-        function combine(obj, newPop)
-            obj.population = [obj.population newPop];
-        end
-        function attackViruses(obj)
+end
+
+function combinedPop = combine(oldPop, newPop)
+	combinedPop = [oldPop newPop];
+end
+
+function newPop = attackViruses(strongCount, pop, strength)
             min = 0;
-            max = size(obj.population,2) - obj.numberOfStrongViruses;
+            max = size(pop,2) - strongCount;
             amount = int8( (max-min).*rand(1,1) + min );
             
-            avgPerformance = obj.evaluatePopPerformance();
+            avgPerformance = evaluatePopPerformance(strength);
             
-            avgVirusIndex = find(obj.strength >= avgPerformance, 1);
+            avgVirusIndex = find(strength >= avgPerformance, 1);
             
-            highPerfromanceViruses = obj.population(:, avgVirusIndex+1:end);
-            lowPerfromanceViruses = obj.population(:, 1:avgVirusIndex);
+            highPerfromanceViruses = pop(:, avgVirusIndex+1:end);
+            lowPerfromanceViruses = pop(:, 1:avgVirusIndex);
 
             remainder = amount - size(lowPerfromanceViruses,2);
             
@@ -144,69 +172,26 @@ classdef VOA < handle
                 highPerfromanceViruses(:, booleanMaskGenerator([1, size(highPerfromanceViruses, 2)], remainder)) = [];
             end
             
-            obj.population = [highPerfromanceViruses lowPerfromanceViruses];
-        end
-        function reduceViruses(obj, limit)
-            if size(obj.population, 2) > limit
-                reductionSize = size(obj.population, 2) - obj.initialPopulation;
-                obj.population(:, booleanMaskGenerator([1, size(obj.population, 2)], reductionSize)) = [];
-            end
-        end
-        function isStoppable = isStoppable(obj)
-            obj.generations = obj.generations + 1;
-            disp(obj.generations);
-            isStoppable = false;
+            newPop = [highPerfromanceViruses lowPerfromanceViruses];
+end
+
+function newPop = reduceViruses(limit, pop, initPopCount)
+    newPop = pop(:, 1:initPopCount);
+    
+    % this is waaaay too slow...
+    %if size(newPop, 2) > limit
+    %    reductionSize = size(newPop, 2) - initPopCount;
+    %    newPop(:, booleanMaskGenerator([1, size(newPop, 2)], reductionSize)) = [];
+    %end
+end
+
+ function [newGen, isStoppable] = isStoppable(gen, maxGen)
+    newGen = gen + 1;
+    
+    isStoppable = false;
             
-            if obj.generations >= obj.maxSolutions
-                isStoppable = true;
-            end
-        end
-        
-        function solutions = start(obj)
-            solutions = [];
-            
-            obj.generatePopulation();
-            obj.evaluateFFValue();
-            
-            while true
-                performance = obj.evaluatePopPerformance();
-            
-                % classification
-                StrongViruses = obj.population(:, 1:obj.numberOfStrongViruses);
-                CommonViruses = obj.population(:, obj.numberOfStrongViruses+1:end);
-                
-                % replication
-                newStrongViruses = obj.replicate(StrongViruses, "strong");
-                newCommonViruses = obj.replicate(CommonViruses, "common");
-                
-                % combination and ranking
-                newViruses = [newStrongViruses newCommonViruses];
-                obj.combine(newViruses);
-                obj.evaluateFFValue();
-                
-                % performance check (with a margin of error: 1)
-                newPerformance = obj.evaluatePopPerformance();
-                if newPerformance -1 > performance
-                    obj.intensifyExploitation();
-                end
-                
-                % apply anti-virus
-                obj.attackViruses();
-                obj.evaluateFFValue();
-                
-                % reduction
-                if size(obj.population, 2) > 1000
-                    obj.reduceViruses(1000);
-                end
-                
-                % check stopping criterion
-                if obj.isStoppable()
-                    break;
-                end
-                
-            end
-            disp(obj.strength(:, 1:5));
-            solutions = obj.population;
-        end    
+    if newGen >= maxGen
+        isStoppable = true;
     end
-end            
+end
+        
