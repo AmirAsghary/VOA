@@ -32,19 +32,10 @@ classdef VOA < handle
         end
         
         function generatePopulation(obj)
-            for i = 1:obj.initialPopulation
-                virus = [];
-                for d = 1:obj.dims
-                    min = obj.limits(1);
-                    max = obj.limits(2);
-                    virus(end+1) = (max-min).*rand(1,1) + min;
-                end
-                obj.population = [obj.population transpose(virus)];
-            end
-            
+            min = obj.limits(1);
+            max = obj.limits(2);
+            obj.population = (max-min).*rand(obj.dims, obj.initialPopulation) + min;
             disp("generated population");
-            %disp(obj.population);
-            %disp("");
         end
         function evaluateFFValue(obj)
             strn = [];
@@ -60,14 +51,7 @@ classdef VOA < handle
             obj.strength = strn;
             
             [obj.strength,sortIdx] = sort(obj.strength,'ascend');
-            %disp(sortIdx);
             obj.population = obj.population(:, sortIdx);
-             
-            %disp("sorted population by FF val");
-            %disp(obj.population);
-            %disp("FF val");
-            %disp(obj.strength);
-            %disp("");
         end 
         function popPerformance = evaluatePopPerformance(obj)
             popPerformance = mean(obj.strength);
@@ -150,27 +134,14 @@ classdef VOA < handle
             amount = int8( (max-min).*rand(1,1) + min );
             
             avgPerformance = obj.evaluatePopPerformance();
-            avgVirusIndex = 0;
-            for i= 1:length(obj.strength)
-                if obj.strength(i) >= avgPerformance
-                    avgVirusIndex = i;
-                    break;
-                end
-            end
-            highPerfromanceViruses = obj.population(:, i+1:end);
-            lowPerfromanceViruses = obj.population(:, 1:i);
             
-            %disp("amount");
-            %disp(amount);
-            %disp("max low");
-            %disp(size(lowPerfromanceViruses,2));
-            %disp(lowPerfromanceViruses);
+            avgVirusIndex = find(obj.strength >= avgPerformance, 1);
             
-            
+            highPerfromanceViruses = obj.population(:, avgVirusIndex+1:end);
+            lowPerfromanceViruses = obj.population(:, 1:avgVirusIndex);
+
             remainder = amount - size(lowPerfromanceViruses,2);
             
-            %disp("remainder");
-            %disp(remainder);
             if remainder <= 0
                 lowPerfromanceViruses(:, booleanMaskGenerator([1, size(lowPerfromanceViruses, 2)], amount)) = [];
             else
@@ -181,9 +152,9 @@ classdef VOA < handle
             obj.population = [highPerfromanceViruses lowPerfromanceViruses];
         end
         function reduceViruses(obj, limit)
-            while size(obj.population, 2) > limit
-                tbk = floor((size(obj.population, 2)-1).*rand(1,1) + 1); % to be killed
-                obj.population(:,tbk) = [];
+            if size(obj.population, 2) > limit
+                reductionSize = size(obj.population, 2) - obj.initialPopulation;
+                obj.population(:, booleanMaskGenerator([1, size(obj.population, 2)], reductionSize)) = [];
             end
         end
         function isStoppable = isStoppable(obj)
@@ -204,8 +175,6 @@ classdef VOA < handle
             
             while true
                 performance = obj.evaluatePopPerformance();
-                %disp("first performance");
-                %disp(performance);
             
                 % classification
                 StrongViruses = obj.population(:, 1:obj.numberOfStrongViruses);
@@ -222,8 +191,6 @@ classdef VOA < handle
                 
                 % performance check (with a margin of error: 1)
                 newPerformance = obj.evaluatePopPerformance();
-                %disp("last performance");
-                %disp(newPerformance);
                 if newPerformance -1 > performance
                     obj.intensifyExploitation();
                 end
