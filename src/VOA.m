@@ -1,4 +1,4 @@
-function solutions = VOA(initPop, strongVCount, maxSolutions, dims, limits, FF, nDim)
+function solutions = VOA(initPop, strongVCount, maxSolutions, dims, limits, FF)
              strongVirusGrowth = 1;
              commonVirusGrowth = 1;
              generations = 0;
@@ -90,7 +90,7 @@ end
 function randNum = randomInRange(min, max, intensity, thisPos)
 	randNum = thisPos + ((max-min).*rand(1,1) + min)/intensity * thisPos;
 	while (randNum < min) || (randNum > max)
-        randNum = thisPos + ((max-min).*rand(1,1) + min)/intensity * thisPos;
+        randNum = thisPos + ((max-thisPos-min).*rand(1,1) + min)/intensity * thisPos;
 	end   
 end
 
@@ -176,7 +176,11 @@ function newPop = attackViruses(strongCount, pop, strength)
 end
 
 function newPop = reduceViruses(limit, pop, initPopCount)
-    newPop = pop(:, 1:initPopCount);
+    newPop = pop;
+    
+    if size(newPop,2) > limit
+        newPop = newPop(:, 1:initPopCount);
+    end
     
     % this is waaaay too slow...
     %if size(newPop, 2) > limit
