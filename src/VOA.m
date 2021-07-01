@@ -39,14 +39,9 @@ classdef VOA < handle
         end
         function evaluateFFValue(obj)
             strn = [];
-            
-            for i= 1:size(obj.population,2)
-               if obj.nDim == true
-                  strn(i) = obj.ff(obj.population(:, i), obj.dims); 
-               else
-                  strn(i) = obj.ff(obj.population(:, i)); 
-               end
-            end
+
+            pop2cell = num2cell(obj.population, 1);
+            strn = cellfun(@obj.ff, pop2cell);
             
             obj.strength = strn;
             
