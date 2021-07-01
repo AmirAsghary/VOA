@@ -172,10 +172,13 @@ classdef VOA < handle
             %disp("remainder");
             %disp(remainder);
             if remainder <= 0
-                lowPerfromanceViruses(:, booleanMaskGenerator([1, size(lowPerfromanceViruses, 2)], amount)) = [];
+                lowPerfromanceViruses(:, booleanMaskGenerator(size(lowPerfromanceViruses), amount)) = [];
             else
                 lowPerfromanceViruses = [];
-                highPerfromanceViruses(:, booleanMaskGenerator([1, size(highPerfromanceViruses, 2)], remainder)) = [];
+                for i= 1:remainder
+                    tbk = floor((size(highPerfromanceViruses,2)-1).*rand(1,1) + 1); % tbk = to be killed index :)
+                    highPerfromanceViruses(:,tbk) = [];
+                end
             end
             
             obj.population = [highPerfromanceViruses lowPerfromanceViruses];
